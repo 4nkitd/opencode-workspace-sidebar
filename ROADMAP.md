@@ -11,7 +11,7 @@
 - [x] Quarter-context title refresh with manual-title protection.
 - [x] Full terminal integration suite, including delayed-preview cancellation.
 - [x] Final release review and npm tarball verification.
-- [ ] Publish public GitHub repository and stable tag/release.
+- [x] Publish public GitHub repository and stable tag/release.
 - [ ] Publish npm package.
 
 ## Follow-up
