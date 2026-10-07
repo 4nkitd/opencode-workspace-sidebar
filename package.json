@@ -1,0 +1,33 @@
+{
+  "name": "opencode-workspace-sidebar",
+  "version": "0.1.2",
+  "description": "Projects, sessions, files and Git in a compact sidebar for OpenCode V2",
+  "license": "MIT",
+  "author": "4nkitd",
+  "repository": { "type": "git", "url": "git+https://github.com/4nkitd/opencode-workspace-sidebar.git" },
+  "homepage": "https://github.com/4nkitd/opencode-workspace-sidebar#readme",
+  "bugs": { "url": "https://github.com/4nkitd/opencode-workspace-sidebar/issues" },
+  "keywords": ["opencode", "opencode-plugin", "opencode-v2", "sidebar", "terminal"],
+  "files": ["dist", "index.ts", "tui.ts", "README.md", "LICENSE"],
+  "publishConfig": { "access": "public", "tag": "latest", "registry": "https://registry.npmjs.org/" },
+  "type": "module",
+  "exports": { ".": "./dist/index.js", "./tui": "./dist/tui.js" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bun scripts/build.ts",
+    "test": "bun test test",
+    "verify": "bun scripts/verify.ts",
+    "check": "bun run typecheck && bun test test && bun run build",
+    "prepack": "bun run check"
+  },
+  "dependencies": { "@opencode/plugin": "2.0.23", "opentui-spinner": "0.0.7", "@opentui/core": "0.5.14", "@opentui/solid": "0.5.14", "solid-js": "1.9.15" },
+  "devDependencies": {
+    "@opencode/client": "2.0.23",
+    "@opencode/theme": "2.0.23",
+    "@types/bun": "1.3.10",
+    "typescript": "5.9.3",
+    "sharp": "0.34.5",
+    "ws": "8.21.0",
+    "@types/ws": "8.18.1"
+  }
+}
