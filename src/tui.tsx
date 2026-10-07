@@ -17,6 +17,7 @@ import { editorTerminal } from "./terminal"
 import { autoRenameClient } from "./auto-rename-client"
 
 type Row = { id: string; title: string; detail?: string; indent?: number; status?: string; heading?: boolean; directory?: boolean; group?: string; current?: boolean; running?: boolean; icon?: { glyph: string; tone: Tone }; tone?: Tone; run?: () => void; stage?: () => void; unstage?: () => void; worktrees?: () => void }
+type Side = "left" | "right" | "hidden"
 type GitState = { root: string; branch: string; changes: Change[] }
 
 export default Plugin.define({
@@ -26,7 +27,7 @@ export default Plugin.define({
     if (editorTerminal()) return stopRenaming
     if (!getComponentCatalogue().spinner) extend({ spinner: SpinnerRenderable })
     const [state, update] = context.storage.memory("tabs", { initial: { tab: "projects" as Tab, opened: true } })
-    const [settings, saveSettings] = context.storage.store("settings", { initial: { side: "left" as "left" | "right" } })
+    const [settings, saveSettings] = context.storage.store("settings", { initial: { side: "left" as Side } })
     let disposed = false
     let focus: (() => void) | undefined
     let returnToChat: (() => void) | undefined
@@ -56,7 +57,7 @@ export default Plugin.define({
       commands: [{ id: "workspace-sidebar.settings", title: "Sidebar position", group: "Workspace sidebar", palette: true, slash: { name: "sidebar" }, run: async () => {
           const side = await context.ui.dialog.select({
             title: "Sidebar position", current: settings.side,
-            options: [{ title: "Left", value: "left" as const }, { title: "Right", value: "right" as const }],
+            options: [{ title: "Left", value: "left" as const }, { title: "Right", value: "right" as const }, { title: "Hidden", value: "hidden" as const }],
           })
           if (disposed || !side) return
           await saveSettings((draft) => { draft.side = side }).catch((error: unknown) => {
@@ -82,7 +83,7 @@ export default Plugin.define({
   },
 })
 
-function Dock(props: { context: Plugin.Context; tab: Tab; side: "left" | "right"; opened: boolean; onSelect: (tab: Tab) => void; onFocus: (focus?: () => void, blur?: () => void) => void }) {
+function Dock(props: { context: Plugin.Context; tab: Tab; side: Side; opened: boolean; onSelect: (tab: Tab) => void; onFocus: (focus?: () => void, blur?: () => void) => void }) {
   const context = props.context
   const dimensions = useTerminalDimensions()
   const route = () => context.ui.router.current()
@@ -105,9 +106,9 @@ function Dock(props: { context: Plugin.Context; tab: Tab; side: "left" | "right"
     if (layout.supported && host && !host.isDestroyed) host.flexDirection = props.side === "right" ? "row" : "row-reverse"
   })
   return <box id="workspace-sidebar-dock" ref={(value) => { dock = value }} width={Math.min(42, dimensions().width)} flexShrink={0} height="100%"
-    visible={layout.supported && props.opened && route().type !== "plugin"}
+    visible={layout.supported && props.opened && props.side !== "hidden" && route().type !== "plugin"}
     paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} backgroundColor={context.theme.background.raised.base}>
-    <Show when={layout.supported && props.opened && route().type !== "plugin"}>
+    <Show when={layout.supported && props.opened && props.side !== "hidden" && route().type !== "plugin"}>
       <scrollbox flexGrow={1} minHeight={0} horizontalScrollbarOptions={{ visible: false }}>
         <Sidebar context={context} sessionID={sessionID()} tab={props.tab} onFocus={props.onFocus} />
       </scrollbox>

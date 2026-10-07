@@ -28,6 +28,12 @@ Framebuffer PNGs and JSON frames are generated under ignored `artifacts/`. They 
 
 Global runtime copies, credentials, account stores, generated logs, screenshots, and rollback backups are not included in the repository or npm package.
 
+## v0.1.4 verification
+
+- `/sidebar` gains a Hidden placement: selecting it unmounts the dock and frees the prompt width (the same zero-reserved-width path as the Alt+Shift+B toggle), persisted until Left or Right is chosen again. A fresh packaged-runtime round switches to Hidden, asserts the free prompt width, restores Left and captures 26-sidebar-hidden.
+- Typecheck, build, and 50 unit tests pass; the runtime package is byte-compared against the installed copy.
+- The companion extension stamps `TERM_PROGRAM=vscode` on the OpenCode PTY terminals it hosts, so editor-terminal suppression fires without relying on the host shell environment; the extension suite covers the created PTY environment.
+
 ## Not verified
 
 - OpenCode versions other than 2.0.23.

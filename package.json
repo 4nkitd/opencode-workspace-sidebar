@@ -1,6 +1,6 @@
 {
   "name": "opencode-workspace-sidebar",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Projects, sessions, files and Git in a compact sidebar for OpenCode V2",
   "license": "MIT",
   "author": "4nkitd",

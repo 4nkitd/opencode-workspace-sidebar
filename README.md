@@ -1,6 +1,6 @@
 # OpenCode workspace sidebar
 
-Projects, sessions, files and Git in one terminal sidebar for **OpenCode 2.0.23**. Works on the welcome screen and in chats, with three bottom tabs and a saved left/right position.
+Projects, sessions, files and Git in one terminal sidebar for **OpenCode 2.0.23**. Works on the welcome screen and in chats, with three bottom tabs and a saved left, right or hidden placement.
 
 ## Install
 
@@ -8,7 +8,7 @@ Add the package to the existing `plugins` array in your global `~/.config/openco
 
 ```json
 {
-  "plugins": ["opencode-workspace-sidebar@0.1.3"]
+  "plugins": ["opencode-workspace-sidebar@0.1.4"]
 }
 ```
 
@@ -17,7 +17,7 @@ Add it to `~/.config/opencode/cli.json` as well, and hide the native sidebar to 
 ```json
 {
   "$schema": "https://opencode.ai/v2/cli.json",
-  "plugins": ["opencode-workspace-sidebar@0.1.3"],
+  "plugins": ["opencode-workspace-sidebar@0.1.4"],
   "session": { "sidebar": "hide" }
 }
 ```
@@ -55,7 +55,7 @@ The visual sidebar is disabled in VS Code/VSCodium integrated terminals identifi
 | Esc | Return to chat or close a diff dialog |
 | Ctrl+R | Refresh while sidebar search is focused |
 | Alt+Shift+B | Toggle sidebar; Ctrl+B keeps OpenCode's native background-work action |
-| `/sidebar` | Choose and save Left or Right placement |
+| `/sidebar` | Choose and save Left, Right or Hidden placement (while Hidden, run `/sidebar` again to restore) |
 | Ctrl+S / Ctrl+Q | Save / close Micro while the file pane is focused |
 
 The plugin assigns Ctrl+1/2/3 to sidebar tabs rather than native session-tab selection. On macOS, Alt means Option. If Ghostty does not transmit the shortcuts correctly, add these mappings to its configuration and reload it:

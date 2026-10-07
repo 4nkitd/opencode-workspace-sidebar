@@ -447,6 +447,16 @@ try {
   await call("ui.press", { key: "1", modifiers: { ctrl: true } })
   await waitText("Projects & Sessions")
   await assertLeftSidebar()
+  await chooseSide("Hidden")
+  await waitFor(async () => {
+    const state = await call("ui.state") as { elements: Element[] }
+    return !state.elements.some((item) => item.id === "workspace-search") && state.elements.some((item) => item.id.startsWith("textarea-") && item.x < 10)
+  }, "Hidden sidebar setting frees prompt width")
+  await capture("26-sidebar-hidden")
+  await chooseSide("Left")
+  await call("ui.press", { key: "1", modifiers: { ctrl: true } })
+  await waitText("Projects & Sessions")
+  await assertLeftSidebar()
   await call("ui.press", { key: "o", modifiers: { ctrl: true } })
   await waitText("Search sessions and projects")
   await call("ui.type", { text: "Clean repository session" })
@@ -473,7 +483,7 @@ try {
   await assertLeftSidebar()
   await capture("18-restored-left")
   console.log("PASS: packaged OpenCode TUI shortcuts, mouse, tree, previews, Git, home/session dock, selected project, settings and persisted side restored in a fresh TUI")
-  await Bun.write(join(artifacts, "verification.json"), JSON.stringify({ passed: true, version: "2.0.23", fixture, runtime, screenshots: 19, regressions: ["preview cancellation: Esc, tab, Ctrl+O", "hidden sidebar search focus", "worktree create/remove refresh", "left dock on session and home", "home files/Git use selected project", "sidebar hide restores prompt focus", "/sidebar settings switches sides on home/session", "saved position restored in a fresh TUI"] }, null, 2))
+  await Bun.write(join(artifacts, "verification.json"), JSON.stringify({ passed: true, version: "2.0.23", fixture, runtime, screenshots: 23, regressions: ["preview cancellation: Esc, tab, Ctrl+O", "hidden sidebar search focus", "worktree create/remove refresh", "left dock on session and home", "home files/Git use selected project", "sidebar hide restores prompt focus", "/sidebar settings switches sides on home/session", "hidden placement frees prompt width", "saved position restored in a fresh TUI"] }, null, 2))
   }
 } catch (error) {
   if (socket?.readyState === WebSocket.OPEN) await capture("failure").catch(() => {})
@@ -552,7 +562,7 @@ async function stopUI() {
   ui = undefined
 }
 
-async function chooseSide(side: "Left" | "Right") {
+async function chooseSide(side: "Left" | "Right" | "Hidden") {
   await call("ui.press", { key: "ESCAPE" })
   await call("ui.type", { text: "/sidebar" })
   await call("ui.enter")
