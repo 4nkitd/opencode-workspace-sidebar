@@ -8,7 +8,7 @@ Add the package to the existing `plugins` array in your global `~/.config/openco
 
 ```json
 {
-  "plugins": ["opencode-workspace-sidebar@0.1.2"]
+  "plugins": ["opencode-workspace-sidebar@0.1.3"]
 }
 ```
 
@@ -17,7 +17,7 @@ Add it to `~/.config/opencode/cli.json` as well, and hide the native sidebar to 
 ```json
 {
   "$schema": "https://opencode.ai/v2/cli.json",
-  "plugins": ["opencode-workspace-sidebar@0.1.2"],
+  "plugins": ["opencode-workspace-sidebar@0.1.3"],
   "session": { "sidebar": "hide" }
 }
 ```
@@ -47,23 +47,24 @@ The visual sidebar is disabled in VS Code/VSCodium integrated terminals identifi
 
 | Key | Action |
 | --- | --- |
-| Alt+1 / Alt+2 / Alt+3 | Projects & Sessions / Files / Git |
+| Ctrl+1 / Ctrl+2 / Ctrl+3 | Projects & Sessions / Files / Git |
 | F6 | Next sidebar tab |
 | Up / Down | Select entries while sidebar search is focused |
 | Enter | Open selected entry |
 | Right / Left | Expand/collapse folders or navigate their hierarchy |
 | Esc | Return to chat or close a diff dialog |
 | Ctrl+R | Refresh while sidebar search is focused |
-| Ctrl+X, B | Toggle sidebar with the default leader key |
+| Alt+Shift+B | Toggle sidebar; Ctrl+B keeps OpenCode's native background-work action |
 | `/sidebar` | Choose and save Left or Right placement |
 | Ctrl+S / Ctrl+Q | Save / close Micro while the file pane is focused |
 
-On macOS, Alt means Option. If Ghostty sends `¡`, `™`, and `£` instead, add these mappings to its configuration and reload it:
+The plugin assigns Ctrl+1/2/3 to sidebar tabs rather than native session-tab selection. On macOS, Alt means Option. If Ghostty does not transmit the shortcuts correctly, add these mappings to its configuration and reload it:
 
 ```ini
-keybind = alt+1=csi:49;3u
-keybind = alt+2=csi:50;3u
-keybind = alt+3=csi:51;3u
+keybind = ctrl+1=csi:49;5u
+keybind = ctrl+2=csi:50;5u
+keybind = ctrl+3=csi:51;5u
+keybind = alt+shift+b=csi:98;4u
 ```
 
 The plugin does not modify your terminal configuration.

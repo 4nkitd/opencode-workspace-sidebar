@@ -1,8 +1,10 @@
 # Verification
 
-Release target: **0.1.2**, OpenCode **2.0.23**, tested on macOS arm64.
+Release target: **0.1.3**, OpenCode **2.0.23**, tested on macOS arm64.
 
 ## Checks
+
+- Ctrl+1/2/3 select sidebar tabs; Alt+Shift+B toggles the sidebar; Ctrl+B retains its native action. Physical Ghostty modifier-key tests exercise the terminal path independently of Drive's legacy key encoder.
 
 - Typecheck, build, and 50 unit/integration tests.
 - Full packaged-runtime terminal suite: tab keys and mouse input, file tree, groups, worktree creation/removal, native navigation, welcome/chat dock, saved placement across a fresh TUI, Git stage/unstage, generated and manually edited commit message, staged-only Commit.

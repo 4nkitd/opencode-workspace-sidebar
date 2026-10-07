@@ -59,6 +59,7 @@ await Bun.write(join(config, "opencode.json"), JSON.stringify({
 }))
 await Bun.write(join(config, "cli.json"), JSON.stringify({
   plugins: [runtime], theme: { name: "opencode", mode: "dark" }, animations: false,
+  ...(process.env.SIDEBAR_VERIFY_TOGGLE ? { keybinds: { "workspace-sidebar.toggle": "alt+shift+b" } } : {}),
   session: { sidebar: "hide" }, tabs: { enabled: false }, attention: { sound: false, notifications: false },
 }))
 const port = await freePort()
@@ -177,24 +178,54 @@ try {
   await assertLeftSidebar()
   const firstFrame = await call("ui.capture") as Frame
   if (firstFrame.lines.slice(0, 3).flatMap((line) => line.spans.map((span) => span.text)).join("").includes("Workspace sidebar verification")) throw new Error("Redundant native sidebar title is still visible")
-  if (ghosttyWindow) {
+  if (ghosttyWindow) await apple(`tell application "Ghostty"
+    set win to first window whose id is ${quote(ghosttyWindow)}
+    perform action "reload_config" on focused terminal of selected tab of win
+  end tell`)
+  if (ghosttyWindow && !process.env.SIDEBAR_VERIFY_TOGGLE) {
     for (const tab of [1, 2, 3, 1, 2, 3, 1]) {
       await apple(`tell application "Ghostty"
         activate window (first window whose id is ${quote(ghosttyWindow)})
         activate
       end tell
-      tell application "System Events" to tell process "Ghostty" to key code ${tab === 1 ? 18 : tab === 2 ? 19 : 20} using option down`)
+      tell application "System Events" to tell process "Ghostty" to key code ${tab === 1 ? 18 : tab === 2 ? 19 : 20} using control down`)
       await waitText(tab === 1 ? "Search sessions and projects" : tab === 2 ? "Filter visible files" : "Filter changes")
       await waitFor(async () => {
         const state = await call("ui.state") as { elements: (Element & { focused: boolean })[] }
         return state.elements.some((item) => item.id === "workspace-search" && item.focused)
-      }, `Physical Option+${tab} keeps sidebar focus`)
+      }, `Physical Ctrl+${tab} keeps sidebar focus`)
     }
-    console.log("PASS: physical Ghostty Option+1/2/3 repeated switching with sidebar input focused")
+    console.log("PASS: physical Ghostty Ctrl+1/2/3 repeated switching with sidebar input focused")
   }
   await capture("01-projects")
+  if (process.env.SIDEBAR_VERIFY_TOGGLE) {
+    const toggle = () => ghosttyWindow ? apple(`tell application "Ghostty"
+      set win to first window whose id is ${quote(ghosttyWindow)}
+      activate window win
+      activate
+    end tell
+    tell application "System Events" to tell process "Ghostty" to key code 11 using {option down, shift down}`) : call("ui.press", { key: "b", modifiers: { meta: true, shift: true } })
+    for (const fromChat of [false, true]) {
+      if (fromChat) await call("ui.press", { key: "ESCAPE" })
+      else await call("ui.press", { key: "1", modifiers: { ctrl: true } })
+      await toggle()
+      await waitFor(async () => {
+        const state = await call("ui.state") as { elements: Element[] }
+        return !state.elements.some((item) => item.id === "workspace-search") && state.elements.some((item) => item.id.startsWith("textarea-") && item.x < 10)
+      }, "Alt+Shift+B collapses sidebar without reserving width")
+      await toggle()
+      await waitText("Projects & Sessions")
+      await assertLeftSidebar()
+      await call("ui.press", { key: "b", modifiers: { ctrl: true } })
+      await call("ui.capture")
+      await assertLeftSidebar()
+    }
+    await Bun.write(join(artifacts, "toggle-verification.json"), JSON.stringify({ passed: true, binding: "alt+shift+b", collapseAndReopen: true, fromChatAndSidebar: true, ctrlBDoesNotToggle: true }, null, 2))
+    console.log("PASS: Alt+Shift+B collapses/reopens from chat and sidebar; Ctrl+B does not toggle")
+    break verification
+  }
   if (process.env.SIDEBAR_VERIFY_LAYOUT) {
-    await call("ui.press", { key: "2", modifiers: { meta: true } })
+    await call("ui.press", { key: "2", modifiers: { ctrl: true } })
     await waitText("README.md")
     await click("workspace-row-src/")
     await waitText("main.ts")
@@ -211,7 +242,7 @@ try {
     await waitText("Services (2)")
     await capture("20-project-groups")
   }
-  await call("ui.press", { key: "2", modifiers: { meta: true } })
+  await call("ui.press", { key: "2", modifiers: { ctrl: true } })
   await waitText("Filter visible files")
   await assertLeftSidebar()
   await waitText("README.md")
@@ -271,7 +302,9 @@ try {
   }
   for (const cancel of ["escape", "tab", "dialog"]) {
     console.log(`Checking delayed preview cancellation: ${cancel}`)
-    await call("ui.press", { key: "3", modifiers: { meta: true } })
+    await call("ui.press", { key: "3", modifiers: { ctrl: true } })
+    await click("workspace-search")
+    await call("ui.press", { key: "e", modifiers: { ctrl: true } })
     await call("ui.press", { key: "u", modifiers: { ctrl: true } })
     await call("ui.type", { text: "main.ts" })
     holdPreview = Promise.withResolvers<void>()
@@ -289,8 +322,8 @@ try {
     if (await call("ui.matches", { text: "export const greeting" })) throw new Error(`Cancelled preview reopened after ${cancel}`)
     if (cancel === "dialog") { await waitText("Search sessions and projects"); await call("ui.press", { key: "ESCAPE" }) }
   }
-  await call("ui.press", { key: "1", modifiers: { meta: true } })
-  await call("ui.press", { key: "3", modifiers: { meta: true } })
+  await call("ui.press", { key: "1", modifiers: { ctrl: true } })
+  await call("ui.press", { key: "3", modifiers: { ctrl: true } })
   await click("workspace-tab-git")
   await waitText("Staged")
   await waitFor(async () => {
@@ -336,7 +369,7 @@ try {
   await waitText("Projects & Sessions")
   await call("ui.press", { key: "F6" })
   await waitText("sidebar.ts")
-  await call("ui.press", { key: "1", modifiers: { meta: true } })
+  await call("ui.press", { key: "1", modifiers: { ctrl: true } })
   await waitText("Projects & Sessions")
   await call("ui.type", { text: "Review file" })
   await waitText("Review file tree")
@@ -348,7 +381,7 @@ try {
   await capture("08-native-ctrl-o")
   await call("ui.press", { key: "ESCAPE" })
   await call("ui.resize", { cols: 100, rows: 32 })
-  await call("ui.press", { key: "2", modifiers: { meta: true } })
+  await call("ui.press", { key: "2", modifiers: { ctrl: true } })
   await waitText("Filter visible files")
   await waitFor(async () => {
     const focusState = await call("ui.state") as { elements: (Element & { focused: boolean })[] }
@@ -358,7 +391,7 @@ try {
   await waitText("README.md")
   await capture("09-narrow")
   await call("ui.resize", { cols: 150, rows: 44 })
-  await call("ui.press", { key: "1", modifiers: { meta: true } })
+  await call("ui.press", { key: "1", modifiers: { ctrl: true } })
   await call("ui.type", { text: "second-project" })
   const projects = await client.project.list()
   const secondProject = projects.find((project) => project.canonical.endsWith("/second-project"))!
@@ -387,7 +420,7 @@ try {
   }
   const homeFrame = await call("ui.capture") as Frame
   if (!homeFrame.lines.flatMap((line) => line.spans.map((span) => span.text)).join("").includes("second-project")) throw new Error("Project navigation did not update native home location")
-  await call("ui.press", { key: "2", modifiers: { meta: true } })
+  await call("ui.press", { key: "2", modifiers: { ctrl: true } })
   await waitText("README.md")
   await assertLeftSidebar()
   await capture("14-home-files")
@@ -398,7 +431,7 @@ try {
     const state = await call("ui.state") as { elements: Element[] }
     return !state.elements.some((item) => item.id.startsWith("embeddedTerminal"))
   }, "Home file opens Micro in an editor-only session")
-  await call("ui.press", { key: "3", modifiers: { meta: true } })
+  await call("ui.press", { key: "3", modifiers: { ctrl: true } })
   await waitText("Working tree clean")
   await capture("15-home-git")
   await chooseSide("Right")
@@ -406,13 +439,12 @@ try {
   await capture("16-home-right")
   await chooseSide("Left")
   await assertLeftSidebar()
-  await call("ui.press", { key: "x", modifiers: { ctrl: true } })
-  await call("ui.press", { key: "b" })
+   await call("ui.press", { key: "b", modifiers: { meta: true, shift: true } })
   await waitFor(async () => {
     const state = await call("ui.state") as { elements: (Element & { focused: boolean })[] }
     return !state.elements.some((item) => item.id === "workspace-search") && state.elements.some((item) => item.id.startsWith("textarea-") && item.focused)
   }, "Sidebar toggle returns focus to home prompt")
-  await call("ui.press", { key: "1", modifiers: { meta: true } })
+  await call("ui.press", { key: "1", modifiers: { ctrl: true } })
   await waitText("Projects & Sessions")
   await assertLeftSidebar()
   await call("ui.press", { key: "o", modifiers: { ctrl: true } })
@@ -420,14 +452,14 @@ try {
   await call("ui.type", { text: "Clean repository session" })
   await call("ui.enter")
   await waitText("Clean repository session")
-  await call("ui.press", { key: "3", modifiers: { meta: true } })
+  await call("ui.press", { key: "3", modifiers: { ctrl: true } })
   await waitText("Working tree clean")
   await capture("12-clean-git")
-  await call("ui.press", { key: "1", modifiers: { meta: true } })
+  await call("ui.press", { key: "1", modifiers: { ctrl: true } })
   await call("ui.type", { text: "Non Git project session" })
   await call("ui.enter")
   await waitText("Non Git project session")
-  await call("ui.press", { key: "3", modifiers: { meta: true } })
+  await call("ui.press", { key: "3", modifiers: { ctrl: true } })
   await waitText("not a Git repository")
   await capture("13-non-repository")
   await chooseSide("Right")
@@ -458,7 +490,7 @@ try {
 }
 
 async function startUI(sessionID: string) {
-  const basePort = process.env.SIDEBAR_VERIFY_LAYOUT || process.env.SIDEBAR_VERIFY_EDITOR || process.env.SIDEBAR_VERIFY_SPLIT ? port : proxy!.port
+  const basePort = process.env.SIDEBAR_VERIFY_LAYOUT || process.env.SIDEBAR_VERIFY_EDITOR || process.env.SIDEBAR_VERIFY_SPLIT || process.env.SIDEBAR_VERIFY_TOGGLE ? port : proxy!.port
   const uiEnv = { ...env, OPENCODE_DRIVE: "sidebar", OPENCODE_DRIVE_RENDERER: process.env.SIDEBAR_GHOSTTY ? "visible" : "headless", DRIVE_REGISTRY_DIR: temp }
   if (process.env.SIDEBAR_GHOSTTY) {
     ghosttyWindow = await apple(`tell application "Ghostty"
@@ -563,6 +595,10 @@ async function waitFor(check: () => Promise<boolean>, description: string) {
 }
 
 function call(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  // The Drive legacy encoder drops Ctrl on digits; inject the terminal's CSI-u bytes.
+  if (method === "ui.press" && typeof params.key === "string" && /^[123]$/.test(params.key) && (params.modifiers as { ctrl?: boolean } | undefined)?.ctrl) {
+    params = { key: `\x1b[${params.key.charCodeAt(0)};5u` }
+  }
   if (ghosttyWindow && method === "ui.press" && params.key === "ESCAPE") {
     return apple(`tell application "Ghostty"
       set win to first window whose id is ${quote(ghosttyWindow)}

@@ -42,10 +42,10 @@ export default Plugin.define({
       commands: [
         ...tabs.map((tab, index) => ({
           id: `workspace-sidebar.${tab}`, title: `Sidebar: ${labels[tab]}`, group: "Workspace sidebar",
-          bind: `alt+${index + 1}`, palette: true as const, run: () => select(tab),
+           bind: `ctrl+${index + 1}`, palette: true as const, run: () => select(tab),
         })),
         { id: "workspace-sidebar.next", title: "Next sidebar tab", group: "Workspace sidebar", bind: "f6", palette: true, run: () => select(tabs[(tabs.indexOf(state.tab) + 1) % tabs.length]) },
-        { id: "workspace-sidebar.toggle", title: "Toggle workspace sidebar", group: "Workspace sidebar", bind: "<leader>b", palette: true, run: () => {
+        { id: "workspace-sidebar.toggle", title: "Toggle workspace sidebar", group: "Workspace sidebar", bind: "alt+shift+b", palette: true, run: () => {
           if (state.opened ?? true) { returnToChat?.(); update((draft) => { draft.opened = false }); return }
           select(state.tab)
         } },
@@ -120,7 +120,7 @@ function Dock(props: { context: Plugin.Context; tab: Tab; side: "left" | "right"
                 <text fg={props.tab === tab ? context.theme.text.base : context.theme.text.muted}>
                   <span style={{ fg: tone(context, tabIcons[tab].tone) }}>{tabIcons[tab].glyph}</span> {tab === "projects" ? "Open" : tab === "files" ? "Files" : "Git"}
                 </text>
-                <text fg={props.tab === tab ? tone(context, tabIcons[tab].tone) : context.theme.text.muted}>⌥{index() + 1}</text>
+                <text fg={props.tab === tab ? tone(context, tabIcons[tab].tone) : context.theme.text.muted}>Ctrl+{index() + 1}</text>
               </box>
             )}</For>
           </box>

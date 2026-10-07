@@ -1,5 +1,11 @@
 # Roadmap
 
+## Version 0.1.3
+
+- [x] Ctrl+1/2/3 sidebar tab shortcuts and matching footer labels.
+- [x] Alt+Shift+B sidebar toggle without replacing native Ctrl+B.
+- [x] Review and publish the keyboard-shortcut release.
+
 ## Version 0.1.2
 
 - [x] Projects, sessions, files and Git in a three-tab dock.
