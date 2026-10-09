@@ -117,8 +117,10 @@ export async function readProjectGroups(options: { configPath?: string; home?: s
   }
 }
 
-export function groupProjects(projects: readonly Project[], groups: readonly Group[], query: string): GroupedProjects {
+export function groupProjects(projects: readonly Project[], groups: readonly Group[], query: string, hidden: readonly string[] = [], pinned: readonly string[] = []): GroupedProjects {
   const membership = new Map<string, number>()
+  const hiddenSet = new Set(hidden)
+  const pinnedSet = new Set(pinned)
   groups.forEach((group, index) => group.directories.forEach((directory) => membership.set(directory, index)))
 
   const grouped: Project[][] = groups.map(() => [])
@@ -140,14 +142,14 @@ export function groupProjects(projects: readonly Project[], groups: readonly Gro
   groups.forEach((group, index) => {
     const declared: GroupMembers = {
       name: group.name,
-      projects: grouped[index],
-      directories: group.directories.filter((directory) => !matched.has(directory) && directory !== "/private" && !directory.startsWith("/private/")),
+      projects: grouped[index].filter((project) => !pinnedSet.has(normalize(project.canonical)) && (value || !hiddenSet.has(normalize(project.canonical)))),
+      directories: group.directories.filter((directory) => !pinnedSet.has(directory) && (value || !hiddenSet.has(directory)) && !matched.has(directory) && directory !== "/private" && !directory.startsWith("/private/")),
     }
     if (!value || group.name.toLowerCase().includes(value)) { result.groups.push(declared); return }
     const matchingProjects = declared.projects.filter((project) => haystack(project).includes(value))
     const matchingDirectories = declared.directories.filter((directory) => directory.toLowerCase().includes(value))
     if (matchingProjects.length || matchingDirectories.length) result.groups.push({ name: group.name, projects: matchingProjects, directories: matchingDirectories })
   })
-  result.ungrouped.push(...(value ? ungrouped.filter((project) => haystack(project).includes(value)) : ungrouped))
+  result.ungrouped.push(...(value ? ungrouped.filter((project) => haystack(project).includes(value) && !pinnedSet.has(normalize(project.canonical))) : ungrouped.filter((project) => !hiddenSet.has(normalize(project.canonical)) && !pinnedSet.has(normalize(project.canonical)))))
   return result
 }

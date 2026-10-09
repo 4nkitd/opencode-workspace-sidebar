@@ -1,7 +1,8 @@
 import { LayoutEvents, RenderableEvents, Yoga, type Renderable } from "@opentui/core"
+import { supportsOpenCodeLayout } from "./layout-version"
 
 export function balanceEditorPane(terminal: Renderable, version: string) {
-  if (version !== "2.0.23") return
+  if (!supportsOpenCodeLayout(version)) return
   let pane = terminal.parent
   while (pane?.parent && !pane.parent.getChildren().some((child) => child.id === "session-pane")) pane = pane.parent
   const frame = pane?.parent

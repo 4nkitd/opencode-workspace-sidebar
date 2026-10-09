@@ -53,8 +53,9 @@ export function sortedFiles(entries: readonly FileSystemEntry[]) {
   )
 }
 
-export function recentSessions(loaded: readonly SessionInfo[], fetched: readonly SessionInfo[], query: string, open: readonly string[]) {
+export function recentSessions(loaded: readonly SessionInfo[], fetched: readonly SessionInfo[], query: string, open: readonly string[], hidden: readonly string[] = []) {
   const seen = new Set<string>()
+  const hiddenSet = new Set(hidden)
   const value = query.trim().toLowerCase()
   const pool = [...loaded, ...fetched].filter((session) => {
     if (session.parentID || seen.has(session.id)) return false
@@ -62,7 +63,7 @@ export function recentSessions(loaded: readonly SessionInfo[], fetched: readonly
     return true
   }).toSorted((a, b) => b.time.updated - a.time.updated)
   if (value) return pool.filter((item) => `${item.title} ${item.id} ${item.location.directory}`.toLowerCase().includes(value))
-  return pool.filter((item) => !open.includes(item.id)).slice(0, 8)
+  return pool.filter((item) => !hiddenSet.has(item.id) && !open.includes(item.id)).slice(0, 8)
 }
 
 export function projectsForSearch(projects: readonly Project[], query: string) {

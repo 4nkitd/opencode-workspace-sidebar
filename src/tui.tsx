@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin/tui"
 import type { FileSystemEntry, SessionInfo } from "@opencode/client"
-import { InputRenderable, Renderable, ScrollBoxRenderable } from "@opentui/core"
+import { InputRenderable, MouseButton, Renderable, ScrollBoxRenderable } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { extend, getComponentCatalogue } from "@opentui/solid/components"
 import { SpinnerRenderable } from "opentui-spinner"
@@ -8,17 +8,20 @@ import type {} from "opentui-spinner/solid"
 import { watchFile, unwatchFile } from "node:fs"
 import { createEffect, createMemo, For, onCleanup, onMount, Show, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
-import { basename, clean, fileIcon, labels, recentSessions, sortedFiles, statusTone, tabIcons, tabs, type Tab, type Tone } from "./model"
+import { basename, clean, fileIcon, labels, projectsForSearch, recentSessions, sortedFiles, statusTone, tabIcons, tabs, type Tab, type Tone } from "./model"
 import type { Change } from "./git"
 import { groupProjects, readProjectGroups, type Group } from "./groups"
 import { openMicro, stopMicroLayout } from "./micro"
 import { animationsEnabled, cliConfigPath } from "./appearance"
 import { editorTerminal } from "./terminal"
 import { autoRenameClient } from "./auto-rename-client"
+import { supportsOpenCodeLayout } from "./layout-version"
 
-type Row = { id: string; title: string; detail?: string; indent?: number; status?: string; heading?: boolean; directory?: boolean; group?: string; current?: boolean; running?: boolean; icon?: { glyph: string; tone: Tone }; tone?: Tone; run?: () => void; stage?: () => void; unstage?: () => void; worktrees?: () => void }
+type Row = { id: string; title: string; detail?: string; indent?: number; status?: string; heading?: boolean; directory?: boolean; group?: string; expanded?: boolean; current?: boolean; running?: boolean; hidden?: boolean; pinned?: boolean; icon?: { glyph: string; tone: Tone }; tone?: Tone; run?: () => void; hide?: (hidden: boolean) => Promise<void> | void; pin?: (pinned: boolean) => Promise<void> | void; stage?: () => void; unstage?: () => void; worktrees?: () => void }
 type Side = "left" | "right" | "hidden"
 type GitState = { root: string; branch: string; changes: Change[] }
+type HiddenState = { sessions: string[]; projects: string[] }
+type FavoritesState = { projects: string[]; collapsed: boolean }
 
 export default Plugin.define({
   id: "local.workspace-sidebar",
@@ -28,6 +31,8 @@ export default Plugin.define({
     if (!getComponentCatalogue().spinner) extend({ spinner: SpinnerRenderable })
     const [state, update] = context.storage.memory("tabs", { initial: { tab: "projects" as Tab, opened: true } })
     const [settings, saveSettings] = context.storage.store("settings", { initial: { side: "left" as Side } })
+    const [hidden, saveHidden] = context.storage.store("hidden", { initial: { sessions: [], projects: [] } as HiddenState })
+    const [favorites, saveFavorites] = context.storage.store("favorites", { initial: { projects: [], collapsed: false } as FavoritesState })
     let disposed = false
     let focus: (() => void) | undefined
     let returnToChat: (() => void) | undefined
@@ -67,7 +72,7 @@ export default Plugin.define({
     }))
     context.ui.slot({
       append: "app",
-      render: () => <Dock context={context} tab={state.tab} side={settings.side} opened={state.opened ?? true} onSelect={select} onFocus={(value, blur) => {
+      render: () => <Dock context={context} tab={state.tab} side={settings.side} hidden={hidden} saveHidden={saveHidden} favorites={favorites} saveFavorites={saveFavorites} opened={state.opened ?? true} onSelect={select} onFocus={(value, blur) => {
         focus = value
         returnToChat = blur
         if (!value || !pendingFocus) return
@@ -83,7 +88,7 @@ export default Plugin.define({
   },
 })
 
-function Dock(props: { context: Plugin.Context; tab: Tab; side: Side; opened: boolean; onSelect: (tab: Tab) => void; onFocus: (focus?: () => void, blur?: () => void) => void }) {
+function Dock(props: { context: Plugin.Context; tab: Tab; side: Side; hidden: HiddenState; saveHidden: (mutation: (draft: HiddenState) => void) => Promise<void>; favorites: FavoritesState; saveFavorites: (mutation: (draft: FavoritesState) => void) => Promise<void>; opened: boolean; onSelect: (tab: Tab) => void; onFocus: (focus?: () => void, blur?: () => void) => void }) {
   const context = props.context
   const dimensions = useTerminalDimensions()
   const route = () => context.ui.router.current()
@@ -93,11 +98,11 @@ function Dock(props: { context: Plugin.Context; tab: Tab; side: Side; opened: bo
   const [layout, setLayout] = createStore({ supported: false })
   onMount(() => {
     const parent = dock?.parent
-    if (context.app.version !== "2.0.23" || !parent || parent.getChildren()[0] === dock || parent.getLayoutNode().getFlexDirection() !== 0) {
+    if (!supportsOpenCodeLayout(context.app.version) || !parent || parent.getChildren()[0] === dock || parent.getLayoutNode().getFlexDirection() !== 0) {
       context.ui.toast.show({ message: "Workspace sidebar layout is unsupported by this OpenCode version", variant: "warning" })
       return
     }
-    // The app slot shares the 2.0.23 main column. Reflow its siblings; never reparent or patch host render methods.
+    // The app slot shares the main column. Reflow its siblings; never reparent or patch host render methods.
     host = parent
     setLayout("supported", true)
     onCleanup(() => { if (!parent.isDestroyed) parent.flexDirection = "column" })
@@ -110,7 +115,7 @@ function Dock(props: { context: Plugin.Context; tab: Tab; side: Side; opened: bo
     paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2} backgroundColor={context.theme.background.raised.base}>
     <Show when={layout.supported && props.opened && props.side !== "hidden" && route().type !== "plugin"}>
       <scrollbox flexGrow={1} minHeight={0} horizontalScrollbarOptions={{ visible: false }}>
-        <Sidebar context={context} sessionID={sessionID()} tab={props.tab} onFocus={props.onFocus} />
+        <Sidebar context={context} sessionID={sessionID()} tab={props.tab} hidden={props.hidden} saveHidden={props.saveHidden} favorites={props.favorites} saveFavorites={props.saveFavorites} onFocus={props.onFocus} />
       </scrollbox>
       <box flexShrink={0} gap={1} paddingTop={1}>
           <box flexDirection="row" gap={1}>
@@ -131,7 +136,7 @@ function Dock(props: { context: Plugin.Context; tab: Tab; side: Side; opened: bo
   </box>
 }
 
-function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab; onFocus: (focus?: () => void, blur?: () => void) => void }) {
+function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab; hidden: HiddenState; saveHidden: (mutation: (draft: HiddenState) => void) => Promise<void>; favorites: FavoritesState; saveFavorites: (mutation: (draft: FavoritesState) => void) => Promise<void>; onFocus: (focus?: () => void, blur?: () => void) => void }) {
   const context = props.context
   const [state, set] = createStore({
     query: "", selected: "", sessions: [] as SessionInfo[], error: "", busy: false,
@@ -170,6 +175,50 @@ function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab;
   onCleanup(() => unwatchFile(cliConfigPath(), updateAnimations))
 
   const fail = (error: unknown) => set("error", clean(error instanceof Error ? error.message : String(error)))
+  const setHidden = async (kind: keyof HiddenState, id: string, hidden: boolean) => {
+    try {
+      await props.saveHidden((draft) => {
+        const items = draft[kind]
+        const index = items.indexOf(id)
+        if (hidden && index < 0) items.push(id)
+        if (!hidden && index >= 0) items.splice(index, 1)
+      })
+    } catch (error) {
+      context.ui.toast.show({ message: `Could not update hidden item: ${clean(String(error))}`, variant: "error" })
+    }
+  }
+  const setPinned = async (path: string, pinned: boolean) => {
+    try {
+      await props.saveFavorites((draft) => {
+        const index = draft.projects.indexOf(path)
+        if (pinned && index < 0) draft.projects.push(path)
+        if (!pinned && index >= 0) draft.projects.splice(index, 1)
+      })
+    } catch (error) {
+      context.ui.toast.show({ message: `Could not update pinned project: ${clean(String(error))}`, variant: "error" })
+    }
+  }
+  const setFavoritesCollapsed = async (collapsed: boolean) => {
+    try {
+      await props.saveFavorites((draft) => { draft.collapsed = collapsed })
+    } catch (error) {
+      context.ui.toast.show({ message: `Could not update Favorites section: ${clean(String(error))}`, variant: "error" })
+    }
+  }
+  const showRowMenu = async (row: Row) => {
+    const options = [
+      ...(row.pin ? [{ title: row.pinned ? "Unpin" : "Pin", value: "pin" as const }] : []),
+      ...(row.hide ? [{ title: row.hidden ? "Show" : "Hide", value: "visibility" as const }] : []),
+    ]
+    if (!options.length) return
+    const action = await context.ui.dialog.select({
+      title: clean(row.title).replace(/\s/g, " "),
+      options,
+    })
+    if (disposed || !action) return
+    if (action === "pin") await row.pin?.(!row.pinned)
+    if (action === "visibility") await row.hide?.(!row.hidden)
+  }
   const rpc = async (method: string, data: Record<string, string | boolean | { providerID: string; id: string; variant?: string }> = {}) => {
     const result = await context.client.rpc.call({ rpcID: "workspace-sidebar", method, location: { directory: directory() }, input: data })
     return result.output as unknown
@@ -356,13 +405,18 @@ function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab;
     const query = state.query.toLowerCase().trim()
     if (props.tab === "projects") {
       const recent = recentSessions(context.data.session.list(), state.sessions, query,
-        context.ui.tabs.enabled() ? context.ui.tabs.list().map((tab) => tab.sessionID) : [])
-      const grouped = groupProjects(context.data.project.list(), state.groups, query)
+        context.ui.tabs.enabled() ? context.ui.tabs.list().map((tab) => tab.sessionID) : [], props.hidden.sessions)
+      const projects = context.data.project.list()
+      const pinned = new Set(props.favorites.projects)
+      const pinnedProjects = projectsForSearch(projects, query).filter((project) => pinned.has(project.canonical) && (Boolean(query) || !props.hidden.projects.includes(project.canonical)))
+      const grouped = groupProjects(projects, state.groups, query, props.hidden.projects, props.favorites.projects)
       const projectRows = (path: string, indent: number, project?: ReturnType<typeof context.data.project.get>): Row[] => [{
         id: project?.id ?? `directory:${path}`, title: project?.name || basename(path),
         current: currentSession()?.projectID === project?.id && project !== undefined || path === directory() || !!project?.sandboxes.includes(directory()),
-        icon: fileIcon(path, true), detail: context.ui.format.path(path), indent,
+        icon: fileIcon(path, true), detail: `${context.ui.format.path(path)}${props.hidden.projects.includes(path) ? " · Hidden" : ""}`, indent,
         run: () => openProject(path),
+        hidden: props.hidden.projects.includes(path), pinned: props.favorites.projects.includes(path), hide: (value) => setHidden("projects", path, value),
+        ...(project ? { pin: (value: boolean) => setPinned(path, value) } : {}),
         ...(project?.vcs === "git" ? { worktrees: () => {
           set("project", state.project === project.id ? "" : project.id)
           if (state.project) void loadWorktrees(project.id).catch(fail)
@@ -371,16 +425,22 @@ function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab;
         id: `worktree:${worktree}`, title: basename(worktree), detail: context.ui.format.path(worktree), indent: indent + 1,
         current: worktree === directory(), icon: { glyph: "\ue702", tone: "orange" as Tone }, run: () => openProject(worktree),
       })) : [])]
+      const favoriteRows = pinnedProjects.length || (props.favorites.projects.length && query) ? [
+        { id: "favorites", title: `Favorites (${pinnedProjects.length})`, heading: true, group: "favorites", expanded: !props.favorites.collapsed || !!query, icon: { glyph: "\uf005", tone: "yellow" as Tone }, run: () => void setFavoritesCollapsed(!props.favorites.collapsed) },
+        ...(!props.favorites.collapsed || query ? pinnedProjects.flatMap((project) => projectRows(project.canonical, 1, project)) : []),
+      ] : []
       return [
+        ...favoriteRows,
         { id: "sessions", title: "Sessions", heading: true, icon: { glyph: "\uf086", tone: "purple" } },
         ...recent.map((session): Row => {
           const running = context.data.session.status(session.id) === "running" || context.data.session.family(session.id).some((id) => context.data.session.status(id) === "running")
           return {
             id: session.id, title: session.title || "Untitled session",
-            detail: `${basename(session.location.directory)} · ${age(session.time.updated)}${running ? " · Running" : ""}`,
+            detail: `${basename(session.location.directory)} · ${age(session.time.updated)}${running ? " · Running" : ""}${props.hidden.sessions.includes(session.id) ? " · Hidden" : ""}`,
             running, current: props.sessionID !== undefined && context.data.session.root(props.sessionID) === session.id,
             icon: { glyph: running ? "\uf0e7" : "\uf075", tone: running ? "green" : "purple" },
             run: () => openSession(session.id),
+            hidden: props.hidden.sessions.includes(session.id), hide: (value) => setHidden("sessions", session.id, value),
           }
         }),
         { id: "projects", title: "Projects", heading: true, icon: { glyph: "\uf07c", tone: "purple" } },
@@ -497,7 +557,11 @@ function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab;
           <box id={`workspace-row-${row.id}`} ref={(value) => { nodes.set(row.id, value); onCleanup(() => nodes.delete(row.id)) }}
              paddingLeft={Math.min(row.indent ?? 0, 8) * 2} paddingTop={row.heading ? 1 : 0} flexDirection="row"
              backgroundColor={row.current && row.id.startsWith("ses_") ? (context.themeMode === "dark" ? "#1f3041" : "#d9eafa") : row.id === state.selected ? context.theme.background.raised.high : undefined}
-            onMouseUp={row.run ? (event) => { event.stopPropagation(); focus(); set("selected", row.id); row.run?.() } : undefined}>
+             onMouseUp={row.run || row.hide ? (event) => {
+               event.stopPropagation()
+               if (event.button === MouseButton.RIGHT && row.hide) { focus(); set("selected", row.id); void showRowMenu(row); return }
+               if (event.button === MouseButton.LEFT && row.run) { focus(); set("selected", row.id); row.run() }
+             } : undefined}>
               <Show when={!row.heading}>
               <box width={1} flexShrink={0}>
                  <text fg={row.current ? tone(context, "blue") : tone(context, "green")}>{row.running || row.current ? "▎" : " "}</text>
@@ -508,7 +572,7 @@ function Sidebar(props: { context: Plugin.Context; sessionID?: string; tab: Tab;
               <box flexDirection="row" justifyContent="space-between">
                 <box flexDirection="row" flexShrink={1} minWidth={0}>
                    <Show when={row.directory}><text fg={context.theme.text.muted}>{state.expanded[row.id] ? "▾ " : "▸ "}</text></Show>
-                   <Show when={row.group}><text fg={context.theme.text.muted}>{state.query || state.groupExpanded[row.id] || (state.groupExpanded[row.id] === undefined && row.current) ? "▾ " : "▸ "}</text></Show>
+                <Show when={row.group}><text fg={context.theme.text.muted}>{row.expanded !== undefined ? (row.expanded ? "▾ " : "▸ ") : state.query || state.groupExpanded[row.id] || (state.groupExpanded[row.id] === undefined && row.current) ? "▾ " : "▸ "}</text></Show>
                    <Show when={row.icon}>
                      <Show when={row.running} fallback={<text fg={tone(context, row.icon!.tone)} flexShrink={0}>{row.icon!.glyph} </text>}>
                        <box width={2} flexShrink={0}>

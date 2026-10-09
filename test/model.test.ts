@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
-import { clean, fileIcon, sortedFiles, projectsForSearch, statusTone } from "../src/model"
+import type { SessionInfo } from "@opencode/client"
+import { clean, fileIcon, recentSessions, sortedFiles, projectsForSearch, statusTone } from "../src/model"
+import { groupProjects } from "../src/groups"
 
 test("tree sorts directories first without exposing git internals", () => {
   expect(sortedFiles([{ type: "file", path: "z" }, { type: "directory", path: "src" }, { type: "directory", path: ".git" }])).toEqual([
@@ -25,6 +27,33 @@ test("private projects stay hidden from the listing and searches without changin
   expect(projectsForSearch(projects, "/private").map((project) => project.canonical)).toEqual(["/privateer/project"])
   expect(projects).toHaveLength(5)
   expect(projects[2].canonical).toBe("/private/tmp/retained-history")
+})
+
+test("hidden sessions stay out of the default list but remain searchable", () => {
+  const sessions = [
+    { id: "hidden", title: "Hidden session", location: { directory: "/hidden" }, time: { updated: 3 } },
+    { id: "shown", title: "Shown session", location: { directory: "/shown" }, time: { updated: 2 } },
+  ] as unknown as SessionInfo[]
+  expect(recentSessions(sessions, [], "", [], ["hidden"]).map((session) => session.id)).toEqual(["shown"])
+  expect(recentSessions(sessions, [], "hidden", [], ["hidden"]).map((session) => session.id)).toEqual(["hidden"])
+})
+
+test("hidden projects stay out of the default list but remain searchable", () => {
+  const projects = [
+    { id: "hidden", name: "Hidden project", canonical: "/hidden", time: { created: 0, updated: 0, active: 0 }, sandboxes: [] },
+    { id: "shown", name: "Shown project", canonical: "/shown", time: { created: 0, updated: 0, active: 0 }, sandboxes: [] },
+  ]
+  expect(groupProjects(projects, [], "", ["/hidden"]).ungrouped.map((project) => project.id)).toEqual(["shown"])
+  expect(groupProjects(projects, [], "hidden", ["/hidden"]).ungrouped.map((project) => project.id)).toEqual(["hidden"])
+})
+
+test("pinned projects stay out of the general list", () => {
+  const projects = [
+    { id: "pinned", name: "Pinned project", canonical: "/pinned", time: { created: 0, updated: 0, active: 0 }, sandboxes: [] },
+    { id: "shown", name: "Shown project", canonical: "/shown", time: { created: 0, updated: 0, active: 0 }, sandboxes: [] },
+  ]
+  expect(groupProjects(projects, [], "", [], ["/pinned"]).ungrouped.map((project) => project.id)).toEqual(["shown"])
+  expect(groupProjects(projects, [], "pinned", [], ["/pinned"]).ungrouped).toEqual([])
 })
 
 test("file icons identify extensions and open folders", () => {

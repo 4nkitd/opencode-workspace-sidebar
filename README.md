@@ -1,6 +1,6 @@
 # OpenCode workspace sidebar
 
-Projects, sessions, files and Git in one terminal sidebar for **OpenCode 2.0.23**. Works on the welcome screen and in chats, with three bottom tabs and a saved left, right or hidden placement.
+Projects, sessions, files and Git in one terminal sidebar for **OpenCode 2.0.23 and newer 2.0 releases**. Works on the welcome screen and in chats, with three bottom tabs and a saved left, right or hidden placement.
 
 ## Install
 
@@ -31,7 +31,7 @@ brew install micro          # macOS
 sudo apt-get install micro # Debian / Ubuntu
 ```
 
-Both plugin entrypoints are included: `.` for the server and `./tui` for the terminal. Remote servers need the server half and Micro installed there. Remote operation has not been verified. The layout adapters are guarded for OpenCode **2.0.23**; other versions are unsupported until tested.
+Both plugin entrypoints are included: `.` for the server and `./tui` for the terminal. Remote servers need the server half and Micro installed there. Remote operation has not been verified. The layout adapters support OpenCode **2.0.23 and newer 2.0 releases**; other versions are unsupported until tested.
 
 ## Features
 
@@ -40,6 +40,7 @@ Both plugin entrypoints are included: `.` for the server and `./tui` for the ter
 - **Git:** staged, unstaged, conflict and untracked changes; diff previews; per-file stage/unstage; editable generated commit messages; staged-only commits. No automatic staging, discard or push.
 - **Session status:** native running spinner and a steady blue current-session indicator.
 - **Automatic titles:** refresh generated session names at context milestones without injecting chat prompts. See the model-usage notes below.
+- **Visibility:** right-click a project or session to hide it from the default list; search reveals hidden entries and offers Show. Projects also support Pin/Unpin with a persisted, collapsible Favorites section at the top.
 
 The visual sidebar is disabled in VS Code/VSCodium integrated terminals identified by `TERM_PROGRAM=vscode`. It registers no sidebar layout or shortcuts there. Automatic naming remains active, and native Ctrl+O is unchanged.
 
@@ -106,7 +107,7 @@ Title refreshes use OpenCode's selected title model with bounded conversation te
 
 ## Development
 
-Requires Bun 1.3.10, Git and Micro. Full terminal verification also requires OpenCode 2.0.23. Ghostty OS captures additionally require macOS and automation permissions.
+Requires Bun 1.3.10, Git and Micro. Full terminal verification also requires OpenCode 2.0.23 or newer in the 2.0 series. Ghostty OS captures additionally require macOS and automation permissions.
 
 ```sh
 bun install --frozen-lockfile
@@ -122,7 +123,7 @@ Tests use private server/database instances, disposable Git repositories and a l
 ## Limits
 
 - The dock reserves 42 terminal columns. Hide it to recover space in narrow windows.
-- Layout uses the public app slot plus version/structure-guarded 2.0.23 adapters. Unknown host versions are not silently patched.
+- Layout uses the public app slot plus version/structure-guarded 2.0.x adapters. Unknown host versions are not silently patched.
 - Native project-home navigation uses a 2.0.23 router field omitted from the public plugin type declarations; it is covered by terminal integration tests.
 - Previews are limited to 128 KiB and 2,000 displayed lines. Binary files and symlinks escaping the project are rejected. Git output is capped at 2 MiB.
 - Git and Micro run on the connected OpenCode server, not on an unrelated client-side repository.
